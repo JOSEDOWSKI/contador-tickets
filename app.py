@@ -91,16 +91,24 @@ def migrate_old_data():
             print(f"Error migrando datos: {e}")
     return False
 
-def load_jira_config():
-    """Carga la configuración de Jira"""
+def load_jira_config(user_id=None):
+    """Carga la configuración de Jira (por usuario o global)"""
+    # Si hay user_id, intentar cargar configuración del usuario
+    if user_id:
+        user_config_file = DATA_DIR / f'jira_config_{user_id}.json'
+        if user_config_file.exists():
+            with open(user_config_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    
+    # Fallback a configuración global
     if os.path.exists(JIRA_CONFIG_FILE):
         with open(JIRA_CONFIG_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     return None
 
-def fetch_jira_tickets():
+def fetch_jira_tickets(user_id=None):
     """Obtiene tickets de Jira usando la API"""
-    config = load_jira_config()
+    config = load_jira_config(user_id)
     if not config:
         return None
     
@@ -165,9 +173,12 @@ def get_data():
     """Obtiene los datos del mes actual"""
     data = load_month_data()
     
+    # Obtener user_id si existe
+    user_id = request.headers.get('X-User-ID') or request.cookies.get('user_id')
+    
     # Si hay configuración de Jira, intentar sincronizar
-    if load_jira_config():
-        jira_data = fetch_jira_tickets()
+    if load_jira_config(user_id):
+        jira_data = fetch_jira_tickets(user_id)
         if jira_data:
             # Actualizar con datos de Jira si están disponibles
             data['jiraSync'] = jira_data
@@ -236,28 +247,54 @@ def get_month(month):
 @app.route('/api/jira/config', methods=['GET'])
 def get_jira_config():
     """Obtiene la configuración de Jira (sin token)"""
+    # Primero intentar obtener de la sesión del usuario (si existe)
+    user_id = request.headers.get('X-User-ID') or request.cookies.get('user_id')
+    
+    if user_id:
+        user_config_file = DATA_DIR / f'jira_config_{user_id}.json'
+        if user_config_file.exists():
+            with open(user_config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                safe_config = {k: v for k, v in config.items() if k != 'api_token'}
+                safe_config['configured'] = True
+                safe_config['user_specific'] = True
+                return jsonify(safe_config)
+    
+    # Fallback a configuración global (solo para uso personal)
     config = load_jira_config()
     if config:
         safe_config = {k: v for k, v in config.items() if k != 'api_token'}
         safe_config['configured'] = True
+        safe_config['user_specific'] = False
         return jsonify(safe_config)
     return jsonify({'configured': False})
 
 @app.route('/api/jira/config', methods=['POST'])
 def set_jira_config():
-    """Configura Jira"""
+    """Configura Jira (por usuario o global)"""
     try:
         config = request.get_json()
-        with open(JIRA_CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2)
-        return jsonify({'success': True})
+        user_id = request.headers.get('X-User-ID') or request.cookies.get('user_id')
+        
+        # Si hay user_id, guardar configuración por usuario
+        if user_id:
+            user_config_file = DATA_DIR / f'jira_config_{user_id}.json'
+            with open(user_config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2)
+            return jsonify({'success': True, 'user_specific': True})
+        else:
+            # Fallback: configuración global (solo para uso personal)
+            with open(JIRA_CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2)
+            return jsonify({'success': True, 'user_specific': False})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/jira/sync', methods=['POST'])
 def sync_jira():
     """Sincroniza manualmente con Jira"""
-    jira_data = fetch_jira_tickets()
+    user_id = request.headers.get('X-User-ID') or request.cookies.get('user_id')
+    jira_data = fetch_jira_tickets(user_id)
     if jira_data:
         current_data = load_month_data()
         current_data.update({

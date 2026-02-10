@@ -34,7 +34,45 @@
         <div class="reset-section">
             <button class="btn-reset" id="resetBtn">Reiniciar</button>
             <button class="btn-sync" id="syncJiraBtn" style="margin-top: 10px;">🔄 Sincronizar Jira</button>
+            <button class="btn-config" id="configJiraBtn" style="margin-top: 10px;">⚙️ Configurar Jira</button>
             <div id="jiraStatus" style="margin-top: 15px; font-size: 11px; color: #666; text-align: center;"></div>
+        </div>
+    </div>
+
+    <!-- Modal de configuración Jira -->
+    <div id="jiraConfigModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
+        <div style="background: #000; padding: 40px; border-radius: 0; max-width: 500px; width: 90%; border: 1px solid #333;">
+            <h2 style="color: #fff; margin-bottom: 20px; font-size: 18px; font-weight: 400;">Configurar Jira</h2>
+            <form id="jiraConfigForm">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; color: #888; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">URL de Jira</label>
+                    <input type="text" id="jiraUrl" placeholder="https://tu-empresa.atlassian.net" required
+                           style="width: 100%; padding: 12px; background: #111; border: 1px solid #333; color: #fff; font-size: 14px; font-family: inherit;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; color: #888; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Email</label>
+                    <input type="email" id="jiraEmail" placeholder="tu-email@gmail.com" required
+                           style="width: 100%; padding: 12px; background: #111; border: 1px solid #333; color: #fff; font-size: 14px; font-family: inherit;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; color: #888; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">API Token</label>
+                    <input type="password" id="jiraToken" placeholder="Tu API Token de Jira" required
+                           style="width: 100%; padding: 12px; background: #111; border: 1px solid #333; color: #fff; font-size: 14px; font-family: inherit;">
+                    <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" 
+                       style="color: #888; font-size: 11px; text-decoration: none; margin-top: 5px; display: block;">
+                        Obtener API Token →
+                    </a>
+                </div>
+                <div style="margin-bottom: 30px;">
+                    <label style="display: block; color: #888; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">JQL (Opcional)</label>
+                    <input type="text" id="jiraJql" placeholder="assignee = currentUser() AND status != Done"
+                           style="width: 100%; padding: 12px; background: #111; border: 1px solid #333; color: #fff; font-size: 14px; font-family: inherit;">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn" style="flex: 1;">Guardar</button>
+                    <button type="button" id="cancelConfigBtn" class="btn-reset" style="flex: 1;">Cancelar</button>
+                </div>
+            </form>
         </div>
     </div>
 

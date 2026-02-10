@@ -123,16 +123,32 @@ async function resetCounter() {
     }
 }
 
+// Obtener o crear user_id
+function getUserId() {
+    let userId = localStorage.getItem('user_id');
+    if (!userId) {
+        userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('user_id', userId);
+    }
+    return userId;
+}
+
 // Verificar configuración de Jira
 async function checkJiraConfig() {
     try {
-        const response = await fetch(`${API_BASE}/api/jira/config`);
+        const userId = getUserId();
+        const response = await fetch(`${API_BASE}/api/jira/config`, {
+            headers: {
+                'X-User-ID': userId
+            }
+        });
         if (response.ok) {
             const config = await response.json();
             const statusEl = document.getElementById('jiraStatus');
             if (statusEl) {
                 if (config.configured) {
-                    statusEl.textContent = '✓ Jira configurado';
+                    const source = config.user_specific ? ' (tu configuración)' : ' (global)';
+                    statusEl.textContent = '✓ Jira configurado' + source;
                     statusEl.style.color = '#888';
                 } else {
                     statusEl.textContent = '⚠ Jira no configurado';
@@ -142,6 +158,97 @@ async function checkJiraConfig() {
         }
     } catch (e) {
         console.error('Error verificando configuración Jira:', e);
+    }
+}
+
+// Mostrar modal de configuración
+function showJiraConfigModal() {
+    const modal = document.getElementById('jiraConfigModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        
+        // Cargar configuración actual si existe
+        loadCurrentJiraConfig();
+    }
+}
+
+// Cargar configuración actual en el modal
+async function loadCurrentJiraConfig() {
+    try {
+        const userId = getUserId();
+        const response = await fetch(`${API_BASE}/api/jira/config`, {
+            headers: {
+                'X-User-ID': userId
+            }
+        });
+        if (response.ok) {
+            const config = await response.json();
+            if (config.configured) {
+                // Cargar valores (sin token por seguridad)
+                document.getElementById('jiraUrl').value = config.url || '';
+                document.getElementById('jiraEmail').value = config.email || '';
+                document.getElementById('jiraJql').value = config.jql || 'assignee = currentUser() AND status != Done';
+            }
+        }
+    } catch (e) {
+        console.error('Error cargando configuración:', e);
+    }
+}
+
+// Guardar configuración de Jira
+async function saveJiraConfig(event) {
+    event.preventDefault();
+    
+    const config = {
+        url: document.getElementById('jiraUrl').value.trim(),
+        email: document.getElementById('jiraEmail').value.trim(),
+        api_token: document.getElementById('jiraToken').value.trim(),
+        jql: document.getElementById('jiraJql').value.trim() || 'assignee = currentUser() AND status != Done'
+    };
+    
+    if (!config.url || !config.email || !config.api_token) {
+        alert('Por favor completa todos los campos requeridos');
+        return;
+    }
+    
+    try {
+        const userId = getUserId();
+        const response = await fetch(`${API_BASE}/api/jira/config`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-User-ID': userId
+            },
+            body: JSON.stringify(config)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+                alert('✓ Configuración de Jira guardada correctamente');
+                closeJiraConfigModal();
+                checkJiraConfig();
+                // Sincronizar automáticamente
+                syncJira();
+            } else {
+                alert('Error al guardar la configuración');
+            }
+        } else {
+            alert('Error al guardar la configuración');
+        }
+    } catch (e) {
+        console.error('Error guardando configuración:', e);
+        alert('Error al guardar la configuración');
+    }
+}
+
+// Cerrar modal
+function closeJiraConfigModal() {
+    const modal = document.getElementById('jiraConfigModal');
+    if (modal) {
+        modal.style.display = 'none';
+        // Limpiar formulario
+        document.getElementById('jiraConfigForm').reset();
     }
 }
 
@@ -165,8 +272,12 @@ async function syncJira() {
     }
     
     try {
+        const userId = getUserId();
         const response = await fetch(`${API_BASE}/api/jira/sync`, {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'X-User-ID': userId
+            }
         });
         
         if (response.ok) {
@@ -208,6 +319,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resolveTicketBtn = document.getElementById('resolveTicketBtn');
     const resetBtn = document.getElementById('resetBtn');
     const syncJiraBtn = document.getElementById('syncJiraBtn');
+    const configJiraBtn = document.getElementById('configJiraBtn');
+    const jiraConfigForm = document.getElementById('jiraConfigForm');
+    const cancelConfigBtn = document.getElementById('cancelConfigBtn');
     
     if (newTicketBtn) {
         newTicketBtn.addEventListener('click', addNewTicket);
@@ -220,6 +334,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (syncJiraBtn) {
         syncJiraBtn.addEventListener('click', syncJira);
+    }
+    if (configJiraBtn) {
+        configJiraBtn.addEventListener('click', showJiraConfigModal);
+    }
+    if (jiraConfigForm) {
+        jiraConfigForm.addEventListener('submit', saveJiraConfig);
+    }
+    if (cancelConfigBtn) {
+        cancelConfigBtn.addEventListener('click', closeJiraConfigModal);
+    }
+    
+    // Cerrar modal al hacer click fuera
+    const modal = document.getElementById('jiraConfigModal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeJiraConfigModal();
+            }
+        });
     }
     
     // Verificar configuración de Jira después de cargar
