@@ -325,7 +325,21 @@ def index():
 
 @app.route('/<path:path>')
 def serve_static(path):
-    return send_from_directory('.', path)
+    try:
+        return send_from_directory('.', path)
+    except Exception as e:
+        # Si no se encuentra el archivo, devolver 404
+        return jsonify({'error': 'File not found'}), 404
+
+# Health check endpoint para verificar que la app está funcionando
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Endpoint de health check"""
+    return jsonify({
+        'status': 'ok',
+        'service': 'tickets-counter',
+        'timestamp': datetime.now().isoformat()
+    })
 
 if __name__ == '__main__':
     # Migrar datos antiguos al iniciar (solo si se ejecuta directamente)
