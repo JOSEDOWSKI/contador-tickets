@@ -16,4 +16,8 @@ RUN mkdir -p /app/data
 EXPOSE 5000
 
 # Usar gunicorn para producción
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "app:app"]
+# --access-logfile -: logs a stdout
+# --error-logfile -: errores a stderr
+# --log-level info: nivel de logging
+# --preload: precargar aplicación antes de fork workers
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "--preload", "app:app"]

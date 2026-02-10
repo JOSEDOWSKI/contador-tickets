@@ -18,6 +18,12 @@ from pathlib import Path
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
+# Logging inicial
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.info("Aplicación Flask iniciada")
+
 # Configuración
 DATA_DIR = Path('data')
 JIRA_CONFIG_FILE = 'jira_config.json'
@@ -183,7 +189,11 @@ def fetch_jira_tickets(user_id=None):
 @app.route('/api/data', methods=['GET'])
 def get_data():
     """Obtiene los datos del mes actual"""
-    data = load_month_data()
+    try:
+        data = load_month_data()
+    except Exception as e:
+        logger.error(f"Error cargando datos: {e}")
+        return jsonify({'error': str(e)}), 500
     
     # Obtener user_id si existe
     user_id = request.headers.get('X-User-ID') or request.cookies.get('user_id')
@@ -333,13 +343,25 @@ def serve_static(path):
 
 # Health check endpoint para verificar que la app está funcionando
 @app.route('/health', methods=['GET'])
+@app.route('/api/health', methods=['GET'])
 def health_check():
     """Endpoint de health check"""
-    return jsonify({
-        'status': 'ok',
-        'service': 'tickets-counter',
-        'timestamp': datetime.now().isoformat()
-    })
+    try:
+        # Verificar que el directorio de datos existe y es accesible
+        DATA_DIR.mkdir(exist_ok=True)
+        return jsonify({
+            'status': 'ok',
+            'service': 'tickets-counter',
+            'timestamp': datetime.now().isoformat(),
+            'data_dir': str(DATA_DIR),
+            'data_dir_exists': DATA_DIR.exists()
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 if __name__ == '__main__':
     # Migrar datos antiguos al iniciar (solo si se ejecuta directamente)
