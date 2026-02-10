@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contador de Tickets</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="main-stats">
+            <div class="total-tickets">
+                <div class="total-label">Total</div>
+                <div class="total-number" id="totalTickets">0</div>
+            </div>
+            
+            <div class="secondary-stats">
+                <div class="stat-item">
+                    <div class="stat-number" id="pendingTickets">0</div>
+                    <div class="stat-label">Pendientes</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="resolvedTickets">0</div>
+                    <div class="stat-label">Resueltos</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn" id="newTicketBtn">Nuevo Ticket</button>
+            <button class="btn" id="resolveTicketBtn">Ticket Resuelto</button>
+        </div>
+
+        <div class="reset-section">
+            <button class="btn-reset" id="resetBtn">Reiniciar</button>
+            <button class="btn-sync" id="syncJiraBtn" style="margin-top: 10px;">🔄 Sincronizar Jira</button>
+            <div id="jiraStatus" style="margin-top: 15px; font-size: 11px; color: #666; text-align: center;"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

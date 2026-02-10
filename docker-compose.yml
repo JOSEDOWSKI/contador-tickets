@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  tickets-counter:
+    build: .
+    container_name: tickets-counter
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+      - ./jira_config.json:/app/jira_config.json
+    environment:
+      - PORT=5000
+    restart: unless-stopped

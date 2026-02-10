@@ -1,0 +1,165 @@
+# Guía de Integración con Jira
+
+## ¿Cómo Funciona?
+
+La aplicación se conecta a la API de Jira para:
+- ✅ Detectar automáticamente tus tickets pendientes
+- ✅ Contar tickets resueltos/cerrados
+- ✅ Sincronizar datos cada vez que cargas la página
+- ✅ Sincronización manual con un botón
+
+## Paso 1: Obtener API Token de Jira
+
+1. Ve a: https://id.atlassian.com/manage-profile/security/api-tokens
+2. Click en **"Create API token"**
+3. Dale un nombre (ej: "Contador de Tickets")
+4. **Copia el token** generado (solo se muestra una vez)
+
+## Paso 2: Configurar la Integración
+
+### Opción A: Archivo de Configuración (Local)
+
+1. Copia el archivo de ejemplo:
+   ```bash
+   cp jira_config.json.example jira_config.json
+   ```
+
+2. Edita `jira_config.json` con tus datos:
+   ```json
+   {
+     "url": "https://tu-empresa.atlassian.net",
+     "email": "tu-email@empresa.com",
+     "api_token": "TU_TOKEN_AQUI",
+     "jql": "assignee = currentUser() AND status != Done"
+   }
+   ```
+
+   **Campos:**
+   - `url`: URL de tu instancia de Jira (ej: `https://miempresa.atlassian.net`)
+   - `email`: Tu email de Jira
+   - `api_token`: El token que copiaste en el paso 1
+   - `jql`: Query de Jira para filtrar tickets (opcional, tiene un valor por defecto)
+
+### Opción B: Configuración vía API (Producción)
+
+```bash
+curl -X POST https://tu-app.caprover.com/api/jira/config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://tu-empresa.atlassian.net",
+    "email": "tu-email@empresa.com",
+    "api_token": "TU_TOKEN_AQUI",
+    "jql": "assignee = currentUser() AND status != Done"
+  }'
+```
+
+## Paso 3: Personalizar la Búsqueda (JQL)
+
+El campo `jql` permite personalizar qué tickets contar. Ejemplos:
+
+### Solo mis tickets pendientes:
+```json
+"jql": "assignee = currentUser() AND status != Done"
+```
+
+### Tickets de mi equipo:
+```json
+"jql": "assignee in (user1@empresa.com, user2@empresa.com) AND status != Done"
+```
+
+### Tickets de un proyecto específico:
+```json
+"jql": "project = PROYECTO AND assignee = currentUser() AND status != Done"
+```
+
+### Tickets de alta prioridad:
+```json
+"jql": "assignee = currentUser() AND priority = High AND status != Done"
+```
+
+### Todos los tickets abiertos:
+```json
+"jql": "status != Done AND status != Closed"
+```
+
+## Paso 4: Usar la Integración
+
+### Sincronización Automática
+
+Cada vez que cargas la página, la aplicación:
+1. Intenta conectarse a Jira (si está configurado)
+2. Obtiene el conteo de tickets
+3. Muestra los datos actualizados
+
+### Sincronización Manual
+
+- Click en el botón **"🔄 Sincronizar Jira"**
+- O presiona `Ctrl+S` (o `Cmd+S` en Mac)
+
+## Verificar la Configuración
+
+Puedes verificar si Jira está configurado:
+
+```bash
+curl https://tu-app.com/api/jira/config
+```
+
+Respuesta si está configurado:
+```json
+{
+  "configured": true,
+  "url": "https://tu-empresa.atlassian.net",
+  "email": "tu-email@empresa.com",
+  "jql": "assignee = currentUser() AND status != Done"
+}
+```
+
+## Troubleshooting
+
+### Error: "Failed to sync with Jira"
+
+**Causas comunes:**
+1. **Token incorrecto**: Verifica que el API token sea correcto
+2. **URL incorrecta**: Asegúrate de que la URL de Jira sea correcta (sin `/` al final)
+3. **Email incorrecto**: Debe ser el email de tu cuenta de Jira
+4. **JQL inválido**: Verifica que la query JQL sea válida
+
+### Verificar Token
+
+Puedes probar tu token manualmente:
+```bash
+curl -u "tu-email@empresa.com:TU_TOKEN" \
+  "https://tu-empresa.atlassian.net/rest/api/3/myself"
+```
+
+Si funciona, deberías ver información de tu usuario.
+
+### Verificar JQL
+
+Puedes probar tu JQL en Jira:
+1. Ve a Jira
+2. Click en "Issues" > "Search for issues"
+3. Click en "Advanced"
+4. Pega tu JQL
+5. Verifica que funcione
+
+## Seguridad
+
+⚠️ **Importante:**
+- El `jira_config.json` contiene credenciales sensibles
+- **NO** lo subas a GitHub (está en `.gitignore`)
+- En producción, usa variables de entorno o secretos de CapRover
+- El token tiene acceso a tus tickets según los permisos de tu cuenta
+
+## Ejemplo Completo
+
+```json
+{
+  "url": "https://miempresa.atlassian.net",
+  "email": "juan.perez@miempresa.com",
+  "api_token": "ATATT3xFfGF0...",
+  "jql": "project = DEV AND assignee = currentUser() AND status in (\"In Progress\", \"To Do\")"
+}
+```
+
+Esto contará solo los tickets del proyecto "DEV" que están asignados a ti y en estado "In Progress" o "To Do".

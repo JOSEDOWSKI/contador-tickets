@@ -1,0 +1,6 @@
+{
+  "url": "https://tu-empresa.atlassian.net",
+  "email": "tu-email@empresa.com",
+  "api_token": "tu-api-token-de-jira",
+  "jql": "assignee = currentUser() AND status != Done"
+}

@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Datos (NO subir datos ni configuraciones sensibles)
+data/
+*.json.backup
+jira_config.json
+tickets-data.json
+tickets-data.json.backup
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Servicios systemd (solo para local)
+*.service
+install-service.sh
+uninstall-service.sh
+start-tickets.sh
+start.sh
+contador-tickets.desktop
+
+# Docker (opcional, mantener si quieres)
+# docker-compose.yml
