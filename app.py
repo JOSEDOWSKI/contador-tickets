@@ -373,11 +373,6 @@ def health_check():
             'timestamp': datetime.now().isoformat()
         }), 500
 
-# Root endpoint también debe responder para health checks básicos
-@app.route('/')
-def index():
-    return send_from_directory('.', 'index.html')
-
 if __name__ == '__main__':
     # Migrar datos antiguos al iniciar (solo si se ejecuta directamente)
     try:
