@@ -331,37 +331,52 @@ def sync_jira():
 # Servir archivos estáticos
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html')
+    try:
+        return send_from_directory('.', 'index.html')
+    except Exception as e:
+        logger.error(f"Error sirviendo index.html: {e}")
+        return jsonify({'error': 'Error loading page'}), 500
 
 @app.route('/<path:path>')
 def serve_static(path):
     try:
         return send_from_directory('.', path)
     except Exception as e:
+        logger.error(f"Error sirviendo archivo {path}: {e}")
         # Si no se encuentra el archivo, devolver 404
         return jsonify({'error': 'File not found'}), 404
 
 # Health check endpoint para verificar que la app está funcionando
+# CapRover usa este endpoint para verificar que la app está funcionando
 @app.route('/health', methods=['GET'])
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Endpoint de health check"""
+    """Endpoint de health check - usado por CapRover"""
     try:
         # Verificar que el directorio de datos existe y es accesible
         DATA_DIR.mkdir(exist_ok=True)
+        # Intentar leer/escribir para verificar permisos
+        test_file = DATA_DIR / '.health_check'
+        test_file.write_text('ok')
+        test_file.unlink()
+        
         return jsonify({
             'status': 'ok',
             'service': 'tickets-counter',
-            'timestamp': datetime.now().isoformat(),
-            'data_dir': str(DATA_DIR),
-            'data_dir_exists': DATA_DIR.exists()
+            'timestamp': datetime.now().isoformat()
         }), 200
     except Exception as e:
+        logger.error(f"Health check error: {e}")
         return jsonify({
             'status': 'error',
             'error': str(e),
             'timestamp': datetime.now().isoformat()
         }), 500
+
+# Root endpoint también debe responder para health checks básicos
+@app.route('/')
+def index():
+    return send_from_directory('.', 'index.html')
 
 if __name__ == '__main__':
     # Migrar datos antiguos al iniciar (solo si se ejecuta directamente)
