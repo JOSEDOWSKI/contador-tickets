@@ -1,18 +1,18 @@
-# Deploy en CapRover - contador-tickets.eirl.pe
+# Deploy en CapRover - tickets.getdevtools.com
 
-## Configuración Específica para eirl.pe
+## Configuración Específica para getdevtools.com
 
 ### 1. Crear App en CapRover
 
 1. Accede a tu panel de CapRover
 2. Click en **"Apps"** > **"One-Click Apps/Databases"**
 3. Click en **"Create New App"**
-4. Nombre de la app: `contador-tickets`
+4. Nombre de la app: `contador-tickets` (o `tickets`)
 
 ### 2. Configurar Dominio
 
 1. En la app `contador-tickets`, ve a **"HTTP Settings"**
-2. En **"Custom Domain"**, agrega: `contador-tickets.eirl.pe`
+2. En **"Custom Domain"**, agrega: `tickets.getdevtools.com`
 3. Click en **"Save"**
 
 ### 3. Conectar con GitHub
@@ -54,7 +54,7 @@ Si necesitas configurar algo específico:
 Una vez deployado, configura Jira usando la API:
 
 ```bash
-curl -X POST https://contador-tickets.eirl.pe/api/jira/config \
+curl -X POST https://tickets.getdevtools.com/api/jira/config \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://tu-empresa.atlassian.net",
@@ -70,7 +70,7 @@ O crea `jira_config.json` localmente y súbelo como volumen en CapRover.
 
 ```bash
 # Verificar que la app responde
-curl https://contador-tickets.eirl.pe/api/data
+curl https://tickets.getdevtools.com/api/data
 
 # Ver logs
 # Desde CapRover: App > Logs
@@ -87,5 +87,5 @@ curl https://contador-tickets.eirl.pe/api/data
 - Revisa los logs de la app
 
 ### Dominio no funciona
-- Verifica DNS: `contador-tickets.eirl.pe` debe apuntar a tu servidor CapRover
+- Verifica DNS: `tickets.getdevtools.com` debe apuntar a tu servidor CapRover
 - Verifica configuración en CapRover HTTP Settings

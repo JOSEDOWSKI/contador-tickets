@@ -1,4 +1,4 @@
-# 🚀 Inicio Rápido - Deploy a contador-tickets.eirl.pe
+# 🚀 Inicio Rápido - Deploy a tickets.getdevtools.com
 
 ## Pasos Rápidos
 
@@ -62,7 +62,7 @@ git push -u origin main
 ### 4. Configurar Jira (Opcional)
 
 ```bash
-curl -X POST https://contador-tickets.eirl.pe/api/jira/config \
+curl -X POST https://tickets.getdevtools.com/api/jira/config \
   -H "Content-Type: application/json" \
   -d '{
     "url": "https://tu-empresa.atlassian.net",
@@ -76,7 +76,7 @@ curl -X POST https://contador-tickets.eirl.pe/api/jira/config \
 
 ```bash
 # Verificar que funciona
-curl https://contador-tickets.eirl.pe/api/data
+curl https://tickets.getdevtools.com/api/data
 
 # Debería responder con JSON de tus datos
 ```
