@@ -18,13 +18,19 @@ from pathlib import Path
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Registrar health check ANTES de cualquier otra inicialización
-# Esto asegura que responda inmediatamente incluso durante la inicialización
+# Registrar health check INMEDIATAMENTE después de crear la app
+# Esto asegura que responda incluso durante la inicialización
 @app.route('/health', methods=['GET', 'HEAD', 'OPTIONS'])
 @app.route('/api/health', methods=['GET', 'HEAD', 'OPTIONS'])
 def _early_health_check():
-    """Health check temprano - responde antes de que Flask termine de inicializar"""
+    """Health check temprano - responde inmediatamente sin importar nada"""
     return '{"status":"ok"}', 200, {'Content-Type': 'application/json'}
+
+# También registrar root inmediatamente
+@app.route('/', methods=['GET', 'HEAD', 'OPTIONS'])
+def _early_root():
+    """Root temprano - responde inmediatamente"""
+    return '<html><head><title>Contador de Tickets</title></head><body><h1>Contador de Tickets</h1><p>Iniciando...</p></body></html>', 200
 
 # Logging inicial
 import logging
@@ -365,22 +371,16 @@ def sync_jira():
         return jsonify({'success': True, 'data': jira_data})
     return jsonify({'success': False, 'error': 'Failed to sync with Jira'}), 500
 
-# Health check endpoint - DEBE estar ANTES de la ruta catch-all
-# IMPORTANTE: Este endpoint debe responder inmediatamente SIN importar nada
+# Health check endpoint ya está registrado arriba (_early_health_check)
+# Sobrescribir con versión completa después de que todo esté inicializado
 @app.route('/health', methods=['GET', 'HEAD', 'OPTIONS'])
 @app.route('/api/health', methods=['GET', 'HEAD', 'OPTIONS'])
 def health_check():
     """Endpoint de health check - respuesta inmediata sin verificaciones"""
-    # Respuesta mínima y rápida - sin jsonify para ser más rápido
-    response = app.response_class(
-        response='{"status":"ok"}',
-        status=200,
-        mimetype='application/json'
-    )
-    return response
+    return '{"status":"ok"}', 200, {'Content-Type': 'application/json'}
 
-# Root también debe responder inmediatamente para health checks básicos
-# DEBE estar ANTES de la ruta catch-all
+# Root también ya está registrado arriba (_early_root)
+# Sobrescribir con versión completa después de que todo esté inicializado
 @app.route('/', methods=['GET', 'HEAD'])
 def root():
     """Root endpoint - responde inmediatamente"""

@@ -15,11 +15,8 @@ RUN mkdir -p /app/data
 # Exponer puerto
 EXPOSE 5000
 
-# Usar gunicorn para producción
-# --access-logfile -: logs a stdout
-# --error-logfile -: errores a stderr
-# --log-level info: nivel de logging
-# --timeout 120: timeout de requests
-# --keep-alive 5: mantener conexiones vivas
-# --worker-class sync: workers síncronos (más simple)
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "--keep-alive", "5", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "app:app"]
+# Hacer el script ejecutable
+RUN chmod +x start.sh
+
+# Usar script de inicio que asegura respuesta inmediata
+CMD ["./start.sh"]
