@@ -31,6 +31,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.info("=" * 50)
 logger.info("Aplicación Flask iniciada correctamente")
+logger.info(f"Puerto: 5000")
+logger.info(f"Workers: 2")
+logger.info("Health check disponible en: /health")
 logger.info("=" * 50)
 
 # Configuración
@@ -354,16 +357,27 @@ def sync_jira():
         return jsonify({'success': True, 'data': jira_data})
     return jsonify({'success': False, 'error': 'Failed to sync with Jira'}), 500
 
-# Servir archivos estáticos
-@app.route('/')
-def index():
+# Health check endpoint - DEBE estar ANTES de la ruta catch-all
+# IMPORTANTE: Este endpoint debe responder inmediatamente
+@app.route('/health', methods=['GET', 'HEAD'])
+@app.route('/api/health', methods=['GET', 'HEAD'])
+def health_check():
+    """Endpoint de health check - respuesta inmediata sin verificaciones"""
+    return jsonify({'status': 'ok'}), 200
+
+# Root también debe responder inmediatamente para health checks básicos
+# DEBE estar ANTES de la ruta catch-all
+@app.route('/', methods=['GET', 'HEAD'])
+def root():
+    """Root endpoint - responde inmediatamente"""
     try:
         return send_from_directory('.', 'index.html')
     except Exception as e:
         logger.error(f"Error sirviendo index.html: {e}")
-        # Retornar respuesta básica en lugar de error 500
-        return '<html><body><h1>Contador de Tickets</h1><p>Error cargando página. Verifica logs.</p></body></html>', 200
+        # Retornar respuesta básica en lugar de error
+        return '<html><head><title>Contador de Tickets</title></head><body><h1>Contador de Tickets</h1><p>Servicio funcionando</p></body></html>', 200
 
+# Ruta catch-all para archivos estáticos - DEBE estar AL FINAL
 @app.route('/<path:path>')
 def serve_static(path):
     try:
@@ -372,13 +386,6 @@ def serve_static(path):
         logger.error(f"Error sirviendo archivo {path}: {e}")
         # Si no se encuentra el archivo, devolver 404
         return jsonify({'error': 'File not found'}), 404
-
-# Health check endpoint - MUY SIMPLE para evitar problemas
-@app.route('/health', methods=['GET'])
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    """Endpoint de health check - respuesta inmediata sin verificaciones"""
-    return jsonify({'status': 'ok'}), 200
 
 if __name__ == '__main__':
     # Migrar datos antiguos al iniciar (solo si se ejecuta directamente)
