@@ -8,6 +8,7 @@ Backend Flask para el contador de tickets
 
 import json
 import os
+import sys
 from datetime import datetime
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -22,7 +23,10 @@ DATA_DIR = Path('data')
 JIRA_CONFIG_FILE = 'jira_config.json'
 
 # Crear directorio de datos si no existe
-DATA_DIR.mkdir(exist_ok=True)
+try:
+    DATA_DIR.mkdir(exist_ok=True)
+except Exception as e:
+    print(f"Advertencia: No se pudo crear directorio data: {e}")
 
 def get_month_file():
     """Obtiene el archivo JSON del mes actual"""
@@ -52,44 +56,52 @@ def save_month_data(data):
 
 def migrate_old_data():
     """Migra datos del archivo antiguo tickets-data.json al formato mensual"""
-    old_file = Path('tickets-data.json')
-    if old_file.exists():
-        try:
-            with open(old_file, 'r', encoding='utf-8') as f:
-                old_data = json.load(f)
-            
-            # Crear entrada de historial
-            history_entry = {
-                "timestamp": datetime.now().isoformat(),
-                "action": "migrated_from_old_format",
-                "data": old_data
-            }
-            
-            # Cargar datos del mes actual
-            current_data = load_month_data()
-            
-            # Si el mes actual está vacío, usar datos antiguos
-            if current_data['totalTickets'] == 0:
-                current_data.update({
-                    "pendingTickets": old_data.get('pendingTickets', 0),
-                    "totalTickets": old_data.get('totalTickets', 0),
-                    "resolvedTickets": old_data.get('resolvedTickets', 0)
-                })
-            
-            # Agregar al historial
-            if 'history' not in current_data:
-                current_data['history'] = []
-            current_data['history'].append(history_entry)
-            
-            save_month_data(current_data)
-            
-            # Renombrar archivo antiguo como backup
-            old_file.rename('tickets-data.json.backup')
-            print(f"✓ Datos migrados desde tickets-data.json")
-            return True
-        except Exception as e:
-            print(f"Error migrando datos: {e}")
-    return False
+    try:
+        old_file = Path('tickets-data.json')
+        if old_file.exists():
+            try:
+                with open(old_file, 'r', encoding='utf-8') as f:
+                    old_data = json.load(f)
+                
+                # Crear entrada de historial
+                history_entry = {
+                    "timestamp": datetime.now().isoformat(),
+                    "action": "migrated_from_old_format",
+                    "data": old_data
+                }
+                
+                # Cargar datos del mes actual
+                current_data = load_month_data()
+                
+                # Si el mes actual está vacío, usar datos antiguos
+                if current_data['totalTickets'] == 0:
+                    current_data.update({
+                        "pendingTickets": old_data.get('pendingTickets', 0),
+                        "totalTickets": old_data.get('totalTickets', 0),
+                        "resolvedTickets": old_data.get('resolvedTickets', 0)
+                    })
+                
+                # Agregar al historial
+                if 'history' not in current_data:
+                    current_data['history'] = []
+                current_data['history'].append(history_entry)
+                
+                save_month_data(current_data)
+                
+                # Renombrar archivo antiguo como backup
+                backup_file = Path('tickets-data.json.backup')
+                if backup_file.exists():
+                    backup_file.unlink()
+                old_file.rename(backup_file)
+                print(f"✓ Datos migrados desde tickets-data.json")
+                return True
+            except Exception as e:
+                print(f"Error migrando datos: {e}")
+                return False
+        return False
+    except Exception as e:
+        print(f"Error en migrate_old_data: {e}")
+        return False
 
 def load_jira_config(user_id=None):
     """Carga la configuración de Jira (por usuario o global)"""
@@ -316,8 +328,11 @@ def serve_static(path):
     return send_from_directory('.', path)
 
 if __name__ == '__main__':
-    # Migrar datos antiguos al iniciar
-    migrate_old_data()
+    # Migrar datos antiguos al iniciar (solo si se ejecuta directamente)
+    try:
+        migrate_old_data()
+    except Exception as e:
+        print(f"Advertencia al migrar datos: {e}")
     
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
