@@ -10,10 +10,18 @@ La aplicación se conecta a la API de Jira para:
 
 ## Paso 1: Obtener API Token de Jira
 
+### Si usas autenticación con Google:
+
 1. Ve a: https://id.atlassian.com/manage-profile/security/api-tokens
-2. Click en **"Create API token"**
-3. Dale un nombre (ej: "Contador de Tickets")
-4. **Copia el token** generado (solo se muestra una vez)
+2. Si te pide iniciar sesión, usa tu cuenta de Google
+3. Click en **"Create API token"**
+4. Dale un nombre (ej: "Contador de Tickets")
+5. **Copia el token** generado (solo se muestra una vez)
+
+**Nota importante:** Si usas Google para autenticarte en Jira:
+- El **email** que debes usar en la configuración es el email de tu cuenta de Google asociada a Jira
+- El **API token** funciona igual independientemente de cómo inicies sesión
+- No necesitas la contraseña de Google, solo el API token
 
 ## Paso 2: Configurar la Integración
 
@@ -28,7 +36,7 @@ La aplicación se conecta a la API de Jira para:
    ```json
    {
      "url": "https://tu-empresa.atlassian.net",
-     "email": "tu-email@empresa.com",
+     "email": "tu-email@gmail.com",
      "api_token": "TU_TOKEN_AQUI",
      "jql": "assignee = currentUser() AND status != Done"
    }
@@ -36,9 +44,13 @@ La aplicación se conecta a la API de Jira para:
 
    **Campos:**
    - `url`: URL de tu instancia de Jira (ej: `https://miempresa.atlassian.net`)
-   - `email`: Tu email de Jira
+   - `email`: Tu email de Google asociado a Jira (el mismo con el que inicias sesión)
    - `api_token`: El token que copiaste en el paso 1
    - `jql`: Query de Jira para filtrar tickets (opcional, tiene un valor por defecto)
+
+   **Si usas Google para autenticarte:**
+   - `email`: Usa el email de tu cuenta de Google (ej: `tu-nombre@gmail.com`)
+   - No necesitas la contraseña de Google, solo el API token
 
 ### Opción B: Configuración vía API (Producción)
 
@@ -128,11 +140,17 @@ Respuesta si está configurado:
 
 Puedes probar tu token manualmente:
 ```bash
-curl -u "tu-email@empresa.com:TU_TOKEN" \
+# Si usas Google, usa tu email de Google:
+curl -u "tu-email@gmail.com:TU_TOKEN" \
   "https://tu-empresa.atlassian.net/rest/api/3/myself"
 ```
 
 Si funciona, deberías ver información de tu usuario.
+
+**Nota para usuarios de Google:**
+- Usa tu email de Google (el mismo con el que inicias sesión en Jira)
+- El formato es: `email:token` (sin espacios)
+- No necesitas la contraseña de Google
 
 ### Verificar JQL
 
@@ -153,6 +171,17 @@ Puedes probar tu JQL en Jira:
 
 ## Ejemplo Completo
 
+### Ejemplo con cuenta Google:
+```json
+{
+  "url": "https://miempresa.atlassian.net",
+  "email": "juan.perez@gmail.com",
+  "api_token": "ATATT3xFfGF0...",
+  "jql": "project = DEV AND assignee = currentUser() AND status in (\"In Progress\", \"To Do\")"
+}
+```
+
+### Ejemplo con cuenta corporativa:
 ```json
 {
   "url": "https://miempresa.atlassian.net",
@@ -162,4 +191,5 @@ Puedes probar tu JQL en Jira:
 }
 ```
 
+**Importante:** Usa el email con el que inicias sesión en Jira, ya sea de Google o corporativo.
 Esto contará solo los tickets del proyecto "DEV" que están asignados a ti y en estado "In Progress" o "To Do".
