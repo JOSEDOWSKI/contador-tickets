@@ -18,6 +18,14 @@ from pathlib import Path
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
+# Registrar health check ANTES de cualquier otra inicialización
+# Esto asegura que responda inmediatamente incluso durante la inicialización
+@app.route('/health', methods=['GET', 'HEAD', 'OPTIONS'])
+@app.route('/api/health', methods=['GET', 'HEAD', 'OPTIONS'])
+def _early_health_check():
+    """Health check temprano - responde antes de que Flask termine de inicializar"""
+    return '{"status":"ok"}', 200, {'Content-Type': 'application/json'}
+
 # Logging inicial
 import logging
 import sys
@@ -358,12 +366,18 @@ def sync_jira():
     return jsonify({'success': False, 'error': 'Failed to sync with Jira'}), 500
 
 # Health check endpoint - DEBE estar ANTES de la ruta catch-all
-# IMPORTANTE: Este endpoint debe responder inmediatamente
-@app.route('/health', methods=['GET', 'HEAD'])
-@app.route('/api/health', methods=['GET', 'HEAD'])
+# IMPORTANTE: Este endpoint debe responder inmediatamente SIN importar nada
+@app.route('/health', methods=['GET', 'HEAD', 'OPTIONS'])
+@app.route('/api/health', methods=['GET', 'HEAD', 'OPTIONS'])
 def health_check():
     """Endpoint de health check - respuesta inmediata sin verificaciones"""
-    return jsonify({'status': 'ok'}), 200
+    # Respuesta mínima y rápida - sin jsonify para ser más rápido
+    response = app.response_class(
+        response='{"status":"ok"}',
+        status=200,
+        mimetype='application/json'
+    )
+    return response
 
 # Root también debe responder inmediatamente para health checks básicos
 # DEBE estar ANTES de la ruta catch-all
