@@ -47,7 +47,7 @@ Si necesitas configurar algo específico:
 
 1. Click en **"Deploy"**
 2. Espera a que termine el build
-3. Tu app estará disponible en: **https://contador-tickets.eirl.pe**
+3. Tu app estará disponible en: **https://tickets.getdevtools.com**
 
 ## Configurar Jira en Producción
 

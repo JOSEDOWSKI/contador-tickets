@@ -36,7 +36,7 @@ git push -u origin main
 
 2. **Configurar Dominio:**
    - App > HTTP Settings
-   - Custom Domain: `contador-tickets.eirl.pe`
+   - Custom Domain: `tickets.getdevtools.com`
    - Save
 
 3. **Conectar GitHub:**
@@ -57,7 +57,7 @@ git push -u origin main
 5. **Deploy:**
    - Click en "Deploy"
    - Espera el build
-   - ✅ Listo en: https://contador-tickets.eirl.pe
+   - ✅ Listo en: https://tickets.getdevtools.com
 
 ### 4. Configurar Jira (Opcional)
 
