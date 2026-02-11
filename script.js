@@ -182,15 +182,27 @@ async function loadData() {
 
 // Guardar datos en el servidor
 async function saveData(action = 'manual_update') {
+    // Si no hay autenticación, solo guardar en localStorage
+    if (!authToken) {
+        localStorage.setItem('ticketCounter', JSON.stringify(state));
+        return false;
+    }
+    
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // Timeout de 5 segundos
+        
         const response = await fetch(`${API_BASE}/api/save`, {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({
                 ...state,
                 action: action
-            })
+            }),
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         if (response.ok) {
             const result = await response.json();
@@ -198,9 +210,16 @@ async function saveData(action = 'manual_update') {
             // También guardar en localStorage como respaldo
             localStorage.setItem('ticketCounter', JSON.stringify(state));
             return true;
+        } else {
+            console.error('Error al guardar:', response.status);
+            localStorage.setItem('ticketCounter', JSON.stringify(state));
         }
     } catch (e) {
-        console.error('Error al guardar datos:', e);
+        if (e.name === 'AbortError') {
+            console.warn('Guardado cancelado (timeout o navegación)');
+        } else {
+            console.error('Error al guardar datos:', e);
+        }
         // Fallback a localStorage
         localStorage.setItem('ticketCounter', JSON.stringify(state));
     }
@@ -626,7 +645,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
-// Guardar datos antes de cerrar la página
-window.addEventListener('beforeunload', async () => {
-    await saveData();
+// Guardar datos antes de cerrar la página (usar sendBeacon para mayor confiabilidad)
+window.addEventListener('beforeunload', () => {
+    if (authToken && navigator.sendBeacon) {
+        // Usar sendBeacon que es más confiable para beforeunload
+        const data = JSON.stringify({
+            ...state,
+            action: 'beforeunload'
+        });
+        navigator.sendBeacon(
+            `${API_BASE}/api/save`,
+            new Blob([data], { type: 'application/json' })
+        );
+    } else {
+        // Fallback: guardar en localStorage
+        localStorage.setItem('ticketCounter', JSON.stringify(state));
+    }
 });

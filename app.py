@@ -404,8 +404,18 @@ def save_data():
     """Guarda los datos del mes actual"""
     user_id = get_current_user()
     
+    # Si no hay usuario autenticado, retornar error
+    if not user_id:
+        return jsonify({'success': False, 'error': 'No autenticado'}), 401
+    
     try:
-        data = request.get_json()
+        # Manejar tanto JSON como Blob (para sendBeacon)
+        if request.content_type and 'application/json' in request.content_type:
+            data = request.get_json()
+        else:
+            # Para sendBeacon, leer el body directamente
+            data = json.loads(request.data.decode('utf-8'))
+        
         current_data = load_month_data(user_id)
         
         # Actualizar contadores
