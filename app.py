@@ -28,11 +28,7 @@ def _early_health_check():
     """Health check temprano - responde inmediatamente sin importar nada"""
     return '{"status":"ok"}', 200, {'Content-Type': 'application/json'}
 
-# También registrar root inmediatamente
-@app.route('/', methods=['GET', 'HEAD', 'OPTIONS'])
-def _early_root():
-    """Root temprano - responde inmediatamente"""
-    return '<html><head><title>Contador de Tickets</title></head><body><h1>Contador de Tickets</h1><p>Iniciando...</p></body></html>', 200
+# Root se registra más abajo después de la inicialización completa
 
 # Logging inicial
 import logging
@@ -578,17 +574,16 @@ def health_check():
     """Endpoint de health check - respuesta inmediata sin verificaciones"""
     return '{"status":"ok"}', 200, {'Content-Type': 'application/json'}
 
-# Root también ya está registrado arriba (_early_root)
-# Sobrescribir con versión completa después de que todo esté inicializado
+# Servir archivos estáticos
 @app.route('/', methods=['GET', 'HEAD'])
 def root():
-    """Root endpoint - responde inmediatamente"""
+    """Root endpoint - sirve index.html"""
     try:
         return send_from_directory('.', 'index.html')
     except Exception as e:
         logger.error(f"Error sirviendo index.html: {e}")
         # Retornar respuesta básica en lugar de error
-        return '<html><head><title>Contador de Tickets</title></head><body><h1>Contador de Tickets</h1><p>Servicio funcionando</p></body></html>', 200
+        return '<!DOCTYPE html><html><head><title>Contador de Tickets</title></head><body><h1>Contador de Tickets</h1><p>Error cargando página</p></body></html>', 200
 
 # Ruta catch-all para archivos estáticos - DEBE estar AL FINAL
 @app.route('/<path:path>')
