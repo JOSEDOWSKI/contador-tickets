@@ -36,27 +36,7 @@ La aplicación estará disponible en `http://localhost:5000`
 
 ## Deploy en Producción (CapRover)
 
-Ver [DEPLOY.md](DEPLOY.md) para instrucciones completas.
-
-### Resumen Rápido
-
-1. **Migrar datos locales:**
-   ```bash
-   python3 migrate_data.py
-   ```
-
-2. **Subir a GitHub:**
-   ```bash
-   git add .
-   git commit -m "Deploy a producción"
-   git push origin main
-   ```
-
-3. **Configurar en CapRover:**
-   - Crear nueva app
-   - Conectar con GitHub
-   - Configurar volumen para `/app/data`
-   - Deploy
+Ver [CAPROVER.md](CAPROVER.md) para instrucciones completas de deploy.
 
 ## Integración con Jira
 
