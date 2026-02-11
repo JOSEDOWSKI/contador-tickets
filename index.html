@@ -7,6 +7,15 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Header con usuario y logout -->
+    <div id="userHeader" style="position: fixed; top: 20px; right: 20px; z-index: 100; display: none;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span id="userEmail" style="color: #888; font-size: 12px;"></span>
+            <button id="statsBtn" class="btn-reset" style="padding: 6px 12px; font-size: 11px;">📊 Estadísticas</button>
+            <button id="logoutBtn" class="btn-reset" style="padding: 6px 12px; font-size: 11px;">Salir</button>
+        </div>
+    </div>
+
     <div class="container">
         <div class="main-stats">
             <div class="total-tickets">
@@ -36,6 +45,40 @@
             <button class="btn-sync" id="syncJiraBtn" style="margin-top: 10px;">🔄 Sincronizar Jira</button>
             <button class="btn-config" id="configJiraBtn" style="margin-top: 10px;">⚙️ Configurar Jira</button>
             <div id="jiraStatus" style="margin-top: 15px; font-size: 11px; color: #666; text-align: center;"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Login -->
+    <div id="loginModal" style="display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; justify-content: center; align-items: center;">
+        <div style="background: #000; padding: 40px; border-radius: 0; max-width: 400px; width: 90%; border: 1px solid #333;">
+            <h2 style="color: #fff; margin-bottom: 30px; font-size: 24px; font-weight: 300; text-align: center;">Contador de Tickets</h2>
+            <p style="color: #888; font-size: 12px; margin-bottom: 30px; text-align: center; line-height: 1.6;">
+                Ingresa tu email para iniciar sesión y guardar tus datos de forma segura.
+            </p>
+            <form id="loginForm">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; color: #888; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Email</label>
+                    <input type="email" id="loginEmail" placeholder="tu-email@ejemplo.com" required autofocus
+                           style="width: 100%; padding: 12px; background: #111; border: 1px solid #333; color: #fff; font-size: 14px; font-family: inherit;">
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn" style="flex: 1;">Iniciar Sesión</button>
+                </div>
+                <div id="loginError" style="margin-top: 15px; color: #888; font-size: 11px; text-align: center; display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Estadísticas -->
+    <div id="statsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1500; justify-content: center; align-items: center; overflow-y: auto;">
+        <div style="background: #000; padding: 40px; border-radius: 0; max-width: 800px; width: 90%; max-height: 90vh; border: 1px solid #333; margin: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h2 style="color: #fff; font-size: 24px; font-weight: 300;">Estadísticas</h2>
+                <button id="closeStatsBtn" class="btn-reset" style="padding: 8px 16px;">Cerrar</button>
+            </div>
+            <div id="statsContent" style="color: #888; font-size: 14px;">
+                <p style="text-align: center;">Cargando estadísticas...</p>
+            </div>
         </div>
     </div>
 

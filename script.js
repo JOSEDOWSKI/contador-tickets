@@ -6,11 +6,143 @@ let state = {
 };
 
 const API_BASE = window.location.origin;
+let authToken = localStorage.getItem('auth_token');
+let currentUser = null;
+
+// Funciones de autenticación
+async function checkAuth() {
+    if (!authToken) {
+        showLoginModal();
+        return false;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/auth/me`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.authenticated) {
+                currentUser = data.user;
+                hideLoginModal();
+                updateUserHeader();
+                return true;
+            }
+        }
+    } catch (e) {
+        console.error('Error verificando autenticación:', e);
+    }
+    
+    // Si falla, mostrar login
+    authToken = null;
+    localStorage.removeItem('auth_token');
+    showLoginModal();
+    return false;
+}
+
+function showLoginModal() {
+    const modal = document.getElementById('loginModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.getElementById('loginEmail').focus();
+    }
+}
+
+function hideLoginModal() {
+    const modal = document.getElementById('loginModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function updateUserHeader() {
+    const header = document.getElementById('userHeader');
+    const emailEl = document.getElementById('userEmail');
+    if (header && currentUser) {
+        header.style.display = 'block';
+        if (emailEl) {
+            emailEl.textContent = currentUser.email;
+        }
+    }
+}
+
+async function login(email) {
+    try {
+        const response = await fetch(`${API_BASE}/api/auth/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            authToken = result.token;
+            currentUser = result.user;
+            localStorage.setItem('auth_token', authToken);
+            hideLoginModal();
+            updateUserHeader();
+            await loadData();
+            return true;
+        } else {
+            const errorEl = document.getElementById('loginError');
+            if (errorEl) {
+                errorEl.textContent = result.error || 'Error al iniciar sesión';
+                errorEl.style.display = 'block';
+            }
+            return false;
+        }
+    } catch (e) {
+        console.error('Error en login:', e);
+        const errorEl = document.getElementById('loginError');
+        if (errorEl) {
+            errorEl.textContent = 'Error de conexión';
+            errorEl.style.display = 'block';
+        }
+        return false;
+    }
+}
+
+async function logout() {
+    try {
+        await fetch(`${API_BASE}/api/auth/logout`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`
+            }
+        });
+    } catch (e) {
+        console.error('Error en logout:', e);
+    }
+    
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('auth_token');
+    showLoginModal();
+    state = { pendingTickets: 0, totalTickets: 0, resolvedTickets: 0 };
+    updateUI();
+}
+
+function getAuthHeaders() {
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    return headers;
+}
 
 // Cargar datos desde la API
 async function loadData() {
     try {
-        const response = await fetch(`${API_BASE}/api/data`);
+        const response = await fetch(`${API_BASE}/api/data`, {
+            headers: getAuthHeaders()
+        });
         if (response.ok) {
             const data = await response.json();
             state = {
@@ -53,9 +185,7 @@ async function saveData(action = 'manual_update') {
     try {
         const response = await fetch(`${API_BASE}/api/save`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: getAuthHeaders(),
             body: JSON.stringify({
                 ...state,
                 action: action
@@ -263,6 +393,95 @@ function updateJiraStatus(jiraSync) {
     }
 }
 
+// Cargar estadísticas
+async function loadStats() {
+    try {
+        const response = await fetch(`${API_BASE}/api/stats/summary`, {
+            headers: getAuthHeaders()
+        });
+        if (response.ok) {
+            const data = await response.json();
+            return data;
+        }
+    } catch (e) {
+        console.error('Error cargando estadísticas:', e);
+    }
+    return null;
+}
+
+// Mostrar estadísticas
+async function showStats() {
+    const modal = document.getElementById('statsModal');
+    const content = document.getElementById('statsContent');
+    if (!modal || !content) return;
+    
+    modal.style.display = 'flex';
+    content.innerHTML = '<p style="text-align: center;">Cargando estadísticas...</p>';
+    
+    const stats = await loadStats();
+    if (!stats) {
+        content.innerHTML = '<p style="text-align: center; color: #888;">Error al cargar estadísticas</p>';
+        return;
+    }
+    
+    let html = `
+        <div style="margin-bottom: 30px; padding: 20px; background: #111; border: 1px solid #333;">
+            <h3 style="color: #fff; font-size: 18px; font-weight: 300; margin-bottom: 20px;">Resumen Total</h3>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                <div>
+                    <div style="color: #888; font-size: 11px; text-transform: uppercase; margin-bottom: 5px;">Total</div>
+                    <div style="color: #fff; font-size: 32px; font-weight: 300;">${stats.totalTickets}</div>
+                </div>
+                <div>
+                    <div style="color: #888; font-size: 11px; text-transform: uppercase; margin-bottom: 5px;">Pendientes</div>
+                    <div style="color: #fff; font-size: 32px; font-weight: 300;">${stats.pendingTickets}</div>
+                </div>
+                <div>
+                    <div style="color: #888; font-size: 11px; text-transform: uppercase; margin-bottom: 5px;">Resueltos</div>
+                    <div style="color: #fff; font-size: 32px; font-weight: 300;">${stats.resolvedTickets}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (stats.months && stats.months.length > 0) {
+        html += '<h3 style="color: #fff; font-size: 18px; font-weight: 300; margin-bottom: 20px;">Por Mes</h3>';
+        html += '<div style="display: flex; flex-direction: column; gap: 15px;">';
+        
+        for (const month of stats.months) {
+            const monthName = new Date(month.month + '-01').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+            html += `
+                <div style="padding: 20px; background: #111; border: 1px solid #333;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <h4 style="color: #fff; font-size: 16px; font-weight: 300; text-transform: capitalize;">${monthName}</h4>
+                        <span style="color: #888; font-size: 12px;">${month.month}</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                        <div>
+                            <div style="color: #888; font-size: 10px; text-transform: uppercase; margin-bottom: 5px;">Total</div>
+                            <div style="color: #fff; font-size: 24px; font-weight: 300;">${month.totalTickets}</div>
+                        </div>
+                        <div>
+                            <div style="color: #888; font-size: 10px; text-transform: uppercase; margin-bottom: 5px;">Pendientes</div>
+                            <div style="color: #fff; font-size: 24px; font-weight: 300;">${month.pendingTickets}</div>
+                        </div>
+                        <div>
+                            <div style="color: #888; font-size: 10px; text-transform: uppercase; margin-bottom: 5px;">Resueltos</div>
+                            <div style="color: #fff; font-size: 24px; font-weight: 300;">${month.resolvedTickets}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += '</div>';
+    } else {
+        html += '<p style="text-align: center; color: #888;">No hay datos históricos disponibles</p>';
+    }
+    
+    content.innerHTML = html;
+}
+
 // Sincronizar con Jira
 async function syncJira() {
     const statusEl = document.getElementById('jiraStatus');
@@ -276,31 +495,31 @@ async function syncJira() {
         const response = await fetch(`${API_BASE}/api/jira/sync`, {
             method: 'POST',
             headers: {
+                ...getAuthHeaders(),
                 'X-User-ID': userId
             }
         });
         
-        if (response.ok) {
-            const result = await response.json();
-            if (result.success) {
-                state = {
-                    pendingTickets: result.data.pendingTickets,
-                    totalTickets: result.data.totalTickets,
-                    resolvedTickets: result.data.resolvedTickets
-                };
-                updateUI();
-                updateJiraStatus(result.data);
-            } else {
-                if (statusEl) {
-                    statusEl.textContent = '✗ Error al sincronizar';
-                    statusEl.style.color = '#666';
-                }
+        const result = await response.json().catch(() => ({}));
+        if (response.ok && result.success) {
+            state = {
+                pendingTickets: result.data.pendingTickets,
+                totalTickets: result.data.totalTickets,
+                resolvedTickets: result.data.resolvedTickets
+            };
+            updateUI();
+            if (typeof updateJiraStatus === 'function') updateJiraStatus(result.data);
+            if (statusEl) {
+                statusEl.textContent = '✓ Sincronizado';
+                statusEl.style.color = '#888';
             }
         } else {
+            const msg = result.error || 'Error al sincronizar';
             if (statusEl) {
-                statusEl.textContent = '✗ Error al sincronizar';
-                statusEl.style.color = '#666';
+                statusEl.textContent = '✗ ' + msg;
+                statusEl.style.color = '#888';
             }
+            console.error('Sync Jira:', msg);
         }
     } catch (e) {
         console.error('Error al sincronizar con Jira:', e);
@@ -313,6 +532,12 @@ async function syncJira() {
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', async () => {
+    // Verificar autenticación primero
+    const authenticated = await checkAuth();
+    if (!authenticated) {
+        return; // Esperar a que el usuario inicie sesión
+    }
+    
     await loadData();
     
     const newTicketBtn = document.getElementById('newTicketBtn');
@@ -322,6 +547,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const configJiraBtn = document.getElementById('configJiraBtn');
     const jiraConfigForm = document.getElementById('jiraConfigForm');
     const cancelConfigBtn = document.getElementById('cancelConfigBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const statsBtn = document.getElementById('statsBtn');
+    const closeStatsBtn = document.getElementById('closeStatsBtn');
+    const loginForm = document.getElementById('loginForm');
     
     if (newTicketBtn) {
         newTicketBtn.addEventListener('click', addNewTicket);
@@ -343,6 +572,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (cancelConfigBtn) {
         cancelConfigBtn.addEventListener('click', closeJiraConfigModal);
+    }
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', logout);
+    }
+    if (statsBtn) {
+        statsBtn.addEventListener('click', showStats);
+    }
+    if (closeStatsBtn) {
+        closeStatsBtn.addEventListener('click', () => {
+            document.getElementById('statsModal').style.display = 'none';
+        });
+    }
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            if (email) {
+                await login(email);
+            }
+        });
     }
     
     // Cerrar modal al hacer click fuera

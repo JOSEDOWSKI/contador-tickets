@@ -9,6 +9,8 @@ Backend Flask para el contador de tickets
 import json
 import os
 import sys
+import hashlib
+import secrets
 from datetime import datetime
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -52,24 +54,73 @@ logger.info("=" * 50)
 
 # Configuración
 DATA_DIR = Path('data')
+USERS_DIR = DATA_DIR / 'users'
+SESSIONS_FILE = DATA_DIR / 'sessions.json'
 JIRA_CONFIG_FILE = 'jira_config.json'
 
-# Crear directorio de datos si no existe
+# Crear directorios de datos si no existen
 try:
     DATA_DIR.mkdir(exist_ok=True)
+    USERS_DIR.mkdir(exist_ok=True)
 except Exception as e:
     print(f"Advertencia: No se pudo crear directorio data: {e}")
 
-def get_month_file():
-    """Obtiene el archivo JSON del mes actual"""
+# Cargar sesiones
+def load_sessions():
+    """Carga las sesiones activas"""
+    if SESSIONS_FILE.exists():
+        try:
+            with open(SESSIONS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_sessions(sessions):
+    """Guarda las sesiones activas"""
+    with open(SESSIONS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(sessions, f, indent=2)
+
+def get_user_id_from_token(token):
+    """Obtiene el user_id desde un token"""
+    sessions = load_sessions()
+    return sessions.get(token)
+
+def get_current_user():
+    """Obtiene el usuario actual desde el token en el header"""
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        token = request.cookies.get('auth_token')
+    if token:
+        return get_user_id_from_token(token)
+    return None
+
+def get_user_dir(user_id):
+    """Obtiene el directorio de datos del usuario"""
+    if not user_id:
+        return None
+    user_dir = USERS_DIR / user_id
+    user_dir.mkdir(exist_ok=True)
+    return user_dir
+
+def get_month_file(user_id=None):
+    """Obtiene el archivo JSON del mes actual para un usuario"""
     month = datetime.now().strftime('%Y-%m')
+    if user_id:
+        user_dir = get_user_dir(user_id)
+        if user_dir:
+            return user_dir / f'tickets-{month}.json'
+    # Fallback a formato antiguo (sin usuario)
     return DATA_DIR / f'tickets-{month}.json'
 
-def load_month_data():
-    """Carga los datos del mes actual"""
+def load_month_data(user_id=None, month=None):
+    """Carga los datos del mes actual para un usuario"""
+    if month is None:
+        month = datetime.now().strftime('%Y-%m')
+    
     try:
-        month_file = get_month_file()
-        if month_file.exists():
+        month_file = get_month_file(user_id)
+        if month_file and month_file.exists():
             with open(month_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
     except Exception as e:
@@ -79,14 +130,16 @@ def load_month_data():
         "pendingTickets": 0,
         "totalTickets": 0,
         "resolvedTickets": 0,
-        "month": datetime.now().strftime('%Y-%m'),
+        "month": month,
         "history": []
     }
 
-def save_month_data(data):
-    """Guarda los datos del mes actual"""
+def save_month_data(data, user_id=None):
+    """Guarda los datos del mes actual para un usuario"""
     try:
-        month_file = get_month_file()
+        month_file = get_month_file(user_id)
+        if not month_file:
+            raise Exception("No se pudo obtener archivo del mes")
         data['month'] = datetime.now().strftime('%Y-%m')
         with open(month_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -159,10 +212,10 @@ def load_jira_config(user_id=None):
     return None
 
 def fetch_jira_tickets(user_id=None):
-    """Obtiene tickets de Jira usando la API"""
+    """Obtiene tickets de Jira usando la API. Retorna (datos, None) o (None, mensaje_error)."""
     config = load_jira_config(user_id)
     if not config:
-        return None
+        return None, 'No hay configuración de Jira. Usa "Configurar Jira" y guarda tus datos.'
     
     try:
         jira_url = config.get('url', '').rstrip('/')
@@ -171,7 +224,7 @@ def fetch_jira_tickets(user_id=None):
         jql = config.get('jql', 'assignee = currentUser() AND status != Done')
         
         if not all([jira_url, email, api_token]):
-            return None
+            return None, 'Faltan URL, email o API token en la configuración.'
         
         # Construir URL de búsqueda
         search_url = f"{jira_url}/rest/api/3/search"
@@ -188,7 +241,7 @@ def fetch_jira_tickets(user_id=None):
             'maxResults': 100
         }
         
-        response = requests.get(search_url, headers=headers, auth=auth, params=params, timeout=10)
+        response = requests.get(search_url, headers=headers, auth=auth, params=params, timeout=15)
         
         if response.status_code == 200:
             data = response.json()
@@ -210,21 +263,117 @@ def fetch_jira_tickets(user_id=None):
                 'resolvedTickets': resolved,
                 'totalTickets': len(issues),
                 'lastSync': datetime.now().isoformat()
-            }
+            }, None
+        elif response.status_code == 401:
+            return None, 'Credenciales incorrectas. Revisa tu email y API token en "Configurar Jira".'
+        elif response.status_code == 403:
+            return None, 'Sin permiso para acceder a Jira. Revisa que el API token sea válido.'
+        elif response.status_code == 404:
+            return None, f'URL de Jira no encontrada. Revisa que {jira_url} sea correcta.'
         else:
-            print(f"Error Jira API: {response.status_code} - {response.text}")
-            return None
+            try:
+                err_body = response.json()
+                msg = err_body.get('errorMessages', err_body.get('errors', [str(response.text)]))
+                if isinstance(msg, list):
+                    msg = msg[0] if msg else response.text
+            except Exception:
+                msg = response.text[:200] if response.text else f'HTTP {response.status_code}'
+            logger.error(f"Jira API: {response.status_code} - {msg}")
+            return None, f'Jira respondió con error: {msg}'
             
+    except requests.exceptions.Timeout:
+        return None, 'Tiempo de espera agotado al conectar con Jira.'
+    except requests.exceptions.ConnectionError:
+        return None, 'No se pudo conectar con Jira. Revisa la URL y tu conexión.'
     except Exception as e:
-        print(f"Error obteniendo tickets de Jira: {e}")
-        return None
+        logger.exception("Error obteniendo tickets de Jira")
+        return None, f'Error inesperado: {str(e)}'
+
+# Rutas de Autenticación
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """Inicia sesión con email/username"""
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        
+        if not email:
+            return jsonify({'success': False, 'error': 'Email requerido'}), 400
+        
+        # Generar token de sesión
+        user_id = hashlib.sha256(email.encode()).hexdigest()[:16]
+        token = secrets.token_urlsafe(32)
+        
+        # Guardar sesión
+        sessions = load_sessions()
+        sessions[token] = {
+            'user_id': user_id,
+            'email': email,
+            'created_at': datetime.now().isoformat()
+        }
+        save_sessions(sessions)
+        
+        # Crear directorio del usuario si no existe
+        get_user_dir(user_id)
+        
+        return jsonify({
+            'success': True,
+            'token': token,
+            'user': {
+                'id': user_id,
+                'email': email
+            }
+        })
+    except Exception as e:
+        logger.exception("Error en login")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    """Cierra sesión"""
+    try:
+        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if not token:
+            token = request.cookies.get('auth_token')
+        
+        if token:
+            sessions = load_sessions()
+            if token in sessions:
+                del sessions[token]
+                save_sessions(sessions)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.exception("Error en logout")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/auth/me', methods=['GET'])
+def get_current_user_info():
+    """Obtiene información del usuario actual"""
+    user_id = get_current_user()
+    if not user_id:
+        return jsonify({'authenticated': False}), 401
+    
+    sessions = load_sessions()
+    token = request.headers.get('Authorization', '').replace('Bearer ', '') or request.cookies.get('auth_token')
+    session = sessions.get(token, {})
+    
+    return jsonify({
+        'authenticated': True,
+        'user': {
+            'id': user_id,
+            'email': session.get('email', '')
+        }
+    })
 
 # Rutas API
 @app.route('/api/data', methods=['GET'])
 def get_data():
     """Obtiene los datos del mes actual"""
+    user_id = get_current_user()
+    
     try:
-        data = load_month_data()
+        data = load_month_data(user_id)
     except Exception as e:
         logger.error(f"Error cargando datos: {e}")
         # Retornar datos por defecto en lugar de error 500
@@ -236,14 +385,14 @@ def get_data():
             "history": []
         }
     
-    # Obtener user_id si existe
+    # Obtener user_id si existe (para compatibilidad con Jira)
     try:
-        user_id = request.headers.get('X-User-ID') or request.cookies.get('user_id')
+        jira_user_id = request.headers.get('X-User-ID') or request.cookies.get('user_id') or user_id
         
         # Si hay configuración de Jira, intentar sincronizar (sin bloquear si falla)
         try:
-            if load_jira_config(user_id):
-                jira_data = fetch_jira_tickets(user_id)
+            if load_jira_config(jira_user_id):
+                jira_data, _ = fetch_jira_tickets(jira_user_id)
                 if jira_data:
                     data['jiraSync'] = jira_data
         except Exception as e:
@@ -257,9 +406,11 @@ def get_data():
 @app.route('/api/save', methods=['POST'])
 def save_data():
     """Guarda los datos del mes actual"""
+    user_id = get_current_user()
+    
     try:
         data = request.get_json()
-        current_data = load_month_data()
+        current_data = load_month_data(user_id)
         
         # Actualizar contadores
         current_data.update({
@@ -285,29 +436,73 @@ def save_data():
         if len(current_data['history']) > 1000:
             current_data['history'] = current_data['history'][-1000:]
         
-        save_month_data(current_data)
+        save_month_data(current_data, user_id)
         
         return jsonify({'success': True, 'month': current_data['month']})
     except Exception as e:
+        logger.exception("Error guardando datos")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/months', methods=['GET'])
+# Rutas de Estadísticas
+@app.route('/api/stats/months', methods=['GET'])
 def list_months():
-    """Lista todos los meses disponibles"""
+    """Lista todos los meses disponibles para el usuario actual"""
+    user_id = get_current_user()
     months = []
-    for file in DATA_DIR.glob('tickets-*.json'):
-        month = file.stem.replace('tickets-', '')
-        months.append(month)
+    
+    if user_id:
+        user_dir = get_user_dir(user_id)
+        if user_dir:
+            for file in user_dir.glob('tickets-*.json'):
+                month = file.stem.replace('tickets-', '')
+                months.append(month)
+    else:
+        # Fallback a formato antiguo
+        for file in DATA_DIR.glob('tickets-*.json'):
+            month = file.stem.replace('tickets-', '')
+            months.append(month)
+    
     return jsonify(sorted(months, reverse=True))
 
-@app.route('/api/month/<month>', methods=['GET'])
-def get_month(month):
-    """Obtiene datos de un mes específico"""
-    month_file = DATA_DIR / f'tickets-{month}.json'
-    if month_file.exists():
-        with open(month_file, 'r', encoding='utf-8') as f:
-            return jsonify(json.load(f))
-    return jsonify({'error': 'Month not found'}), 404
+@app.route('/api/stats/month/<month>', methods=['GET'])
+def get_month_stats(month):
+    """Obtiene datos de un mes específico para el usuario actual"""
+    user_id = get_current_user()
+    data = load_month_data(user_id, month)
+    return jsonify(data)
+
+@app.route('/api/stats/summary', methods=['GET'])
+def get_stats_summary():
+    """Obtiene resumen de estadísticas de todos los meses"""
+    user_id = get_current_user()
+    months = []
+    
+    if user_id:
+        user_dir = get_user_dir(user_id)
+        if user_dir:
+            for file in sorted(user_dir.glob('tickets-*.json'), reverse=True):
+                month = file.stem.replace('tickets-', '')
+                try:
+                    with open(file, 'r', encoding='utf-8') as f:
+                        month_data = json.load(f)
+                        months.append({
+                            'month': month,
+                            'totalTickets': month_data.get('totalTickets', 0),
+                            'pendingTickets': month_data.get('pendingTickets', 0),
+                            'resolvedTickets': month_data.get('resolvedTickets', 0)
+                        })
+                except Exception as e:
+                    logger.error(f"Error leyendo {file}: {e}")
+    
+    # Calcular totales
+    totals = {
+        'totalTickets': sum(m['totalTickets'] for m in months),
+        'pendingTickets': sum(m['pendingTickets'] for m in months),
+        'resolvedTickets': sum(m['resolvedTickets'] for m in months),
+        'months': months
+    }
+    
+    return jsonify(totals)
 
 @app.route('/api/jira/config', methods=['GET'])
 def get_jira_config():
@@ -358,18 +553,22 @@ def set_jira_config():
 @app.route('/api/jira/sync', methods=['POST'])
 def sync_jira():
     """Sincroniza manualmente con Jira"""
-    user_id = request.headers.get('X-User-ID') or request.cookies.get('user_id')
-    jira_data = fetch_jira_tickets(user_id)
-    if jira_data:
-        current_data = load_month_data()
+    try:
+        user_id = get_current_user() or request.headers.get('X-User-ID') or request.cookies.get('user_id')
+        jira_data, error_msg = fetch_jira_tickets(user_id)
+        if error_msg:
+            return jsonify({'success': False, 'error': error_msg}), 200
+        current_data = load_month_data(user_id)
         current_data.update({
             'pendingTickets': jira_data['pendingTickets'],
             'resolvedTickets': jira_data['resolvedTickets'],
             'totalTickets': jira_data['totalTickets']
         })
-        save_month_data(current_data)
+        save_month_data(current_data, user_id)
         return jsonify({'success': True, 'data': jira_data})
-    return jsonify({'success': False, 'error': 'Failed to sync with Jira'}), 500
+    except Exception as e:
+        logger.exception("Error en sync_jira")
+        return jsonify({'success': False, 'error': str(e)}), 200
 
 # Health check endpoint ya está registrado arriba (_early_health_check)
 # Sobrescribir con versión completa después de que todo esté inicializado
