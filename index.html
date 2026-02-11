@@ -111,6 +111,12 @@
                     <label style="display: block; color: #888; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">JQL (Opcional)</label>
                     <input type="text" id="jiraJql" placeholder="assignee = currentUser() AND status != Done"
                            style="width: 100%; padding: 12px; background: #111; border: 1px solid #333; color: #fff; font-size: 14px; font-family: inherit;">
+                    <div style="color: #666; font-size: 11px; margin-top: 8px; line-height: 1.4;">
+                        <strong>Ejemplos para espacios compartidos:</strong><br>
+                        • Por proyecto: <code style="color: #888;">project = "PROYECTO" AND assignee = currentUser()</code><br>
+                        • Sin filtrar por estado: <code style="color: #888;">assignee = currentUser()</code><br>
+                        • Por espacio: <code style="color: #888;">space = "ESPACIO" AND assignee = currentUser()</code>
+                    </div>
                 </div>
                 <div style="display: flex; gap: 10px;">
                     <button type="submit" class="btn" style="flex: 1;">Guardar</button>
