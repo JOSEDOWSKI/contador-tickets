@@ -71,6 +71,7 @@ function updateUserHeader() {
 
 async function login(email) {
     try {
+        console.log('Intentando login con email:', email);
         const response = await fetch(`${API_BASE}/api/auth/login`, {
             method: 'POST',
             headers: {
@@ -79,14 +80,66 @@ async function login(email) {
             body: JSON.stringify({ email })
         });
         
+        console.log('Respuesta del servidor:', response.status);
         const result = await response.json();
+        console.log('Resultado:', result);
+        
         if (result.success) {
             authToken = result.token;
             currentUser = result.user;
             localStorage.setItem('auth_token', authToken);
+            console.log('Login exitoso, token guardado');
             hideLoginModal();
             updateUserHeader();
+            
+            // Cargar datos y inicializar la aplicación
             await loadData();
+            
+            // Registrar event listeners de la aplicación después del login
+            const newTicketBtn = document.getElementById('newTicketBtn');
+            const resolveTicketBtn = document.getElementById('resolveTicketBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const syncJiraBtn = document.getElementById('syncJiraBtn');
+            const configJiraBtn = document.getElementById('configJiraBtn');
+            const jiraConfigForm = document.getElementById('jiraConfigForm');
+            const cancelConfigBtn = document.getElementById('cancelConfigBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const statsBtn = document.getElementById('statsBtn');
+            const closeStatsBtn = document.getElementById('closeStatsBtn');
+            
+            if (newTicketBtn && !newTicketBtn.onclick) {
+                newTicketBtn.addEventListener('click', addNewTicket);
+            }
+            if (resolveTicketBtn && !resolveTicketBtn.onclick) {
+                resolveTicketBtn.addEventListener('click', resolveTicket);
+            }
+            if (resetBtn && !resetBtn.onclick) {
+                resetBtn.addEventListener('click', resetCounter);
+            }
+            if (syncJiraBtn && !syncJiraBtn.onclick) {
+                syncJiraBtn.addEventListener('click', syncJira);
+            }
+            if (configJiraBtn && !configJiraBtn.onclick) {
+                configJiraBtn.addEventListener('click', showJiraConfigModal);
+            }
+            if (jiraConfigForm && !jiraConfigForm.onsubmit) {
+                jiraConfigForm.addEventListener('submit', saveJiraConfig);
+            }
+            if (cancelConfigBtn && !cancelConfigBtn.onclick) {
+                cancelConfigBtn.addEventListener('click', closeJiraConfigModal);
+            }
+            if (logoutBtn && !logoutBtn.onclick) {
+                logoutBtn.addEventListener('click', logout);
+            }
+            if (statsBtn && !statsBtn.onclick) {
+                statsBtn.addEventListener('click', showStats);
+            }
+            if (closeStatsBtn && !closeStatsBtn.onclick) {
+                closeStatsBtn.addEventListener('click', () => {
+                    document.getElementById('statsModal').style.display = 'none';
+                });
+            }
+            
             return true;
         } else {
             const errorEl = document.getElementById('loginError');
@@ -100,7 +153,7 @@ async function login(email) {
         console.error('Error en login:', e);
         const errorEl = document.getElementById('loginError');
         if (errorEl) {
-            errorEl.textContent = 'Error de conexión';
+            errorEl.textContent = 'Error de conexión: ' + e.message;
             errorEl.style.display = 'block';
         }
         return false;
@@ -550,7 +603,43 @@ async function syncJira() {
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', async () => {
-    // Verificar autenticación primero
+    // Registrar event listeners del login PRIMERO (siempre necesario)
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const emailInput = document.getElementById('loginEmail');
+            const email = emailInput ? emailInput.value.trim() : '';
+            const errorEl = document.getElementById('loginError');
+            
+            if (!email) {
+                if (errorEl) {
+                    errorEl.textContent = 'Por favor ingresa tu email';
+                    errorEl.style.display = 'block';
+                }
+                return;
+            }
+            
+            // Mostrar estado de carga
+            const submitBtn = loginForm.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Iniciando...';
+            }
+            if (errorEl) {
+                errorEl.style.display = 'none';
+            }
+            
+            const success = await login(email);
+            
+            if (!success && submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Iniciar Sesión';
+            }
+        });
+    }
+    
+    // Verificar autenticación
     const authenticated = await checkAuth();
     if (!authenticated) {
         return; // Esperar a que el usuario inicie sesión
@@ -568,7 +657,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const logoutBtn = document.getElementById('logoutBtn');
     const statsBtn = document.getElementById('statsBtn');
     const closeStatsBtn = document.getElementById('closeStatsBtn');
-    const loginForm = document.getElementById('loginForm');
     
     if (newTicketBtn) {
         newTicketBtn.addEventListener('click', addNewTicket);
@@ -600,15 +688,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (closeStatsBtn) {
         closeStatsBtn.addEventListener('click', () => {
             document.getElementById('statsModal').style.display = 'none';
-        });
-    }
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value.trim();
-            if (email) {
-                await login(email);
-            }
         });
     }
     
