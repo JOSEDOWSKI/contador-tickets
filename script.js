@@ -492,12 +492,11 @@ async function syncJira() {
     
     try {
         const userId = getUserId();
+        const headers = getAuthHeaders();
+        headers['X-User-ID'] = userId;
         const response = await fetch(`${API_BASE}/api/jira/sync`, {
             method: 'POST',
-            headers: {
-                ...getAuthHeaders(),
-                'X-User-ID': userId
-            }
+            headers: headers
         });
         
         const result = await response.json().catch(() => ({}));
