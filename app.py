@@ -77,10 +77,25 @@ def save_sessions(sessions):
     with open(SESSIONS_FILE, 'w', encoding='utf-8') as f:
         json.dump(sessions, f, indent=2)
 
+def get_session_from_token(token):
+    """Obtiene la sesión desde un token."""
+    if not token:
+        return None
+    sessions = load_sessions()
+    session = sessions.get(token)
+    if isinstance(session, dict):
+        return session
+    # Compatibilidad con formato antiguo: token -> user_id
+    if isinstance(session, str):
+        return {'user_id': session, 'email': ''}
+    return None
+
 def get_user_id_from_token(token):
     """Obtiene el user_id desde un token"""
-    sessions = load_sessions()
-    return sessions.get(token)
+    session = get_session_from_token(token)
+    if not session:
+        return None
+    return session.get('user_id')
 
 def get_current_user():
     """Obtiene el usuario actual desde el token en el header"""
@@ -99,9 +114,10 @@ def get_user_dir(user_id):
     user_dir.mkdir(exist_ok=True)
     return user_dir
 
-def get_month_file(user_id=None):
+def get_month_file(user_id=None, month=None):
     """Obtiene el archivo JSON del mes actual para un usuario"""
-    month = datetime.now().strftime('%Y-%m')
+    if month is None:
+        month = datetime.now().strftime('%Y-%m')
     if user_id:
         user_dir = get_user_dir(user_id)
         if user_dir:
@@ -115,7 +131,7 @@ def load_month_data(user_id=None, month=None):
         month = datetime.now().strftime('%Y-%m')
     
     try:
-        month_file = get_month_file(user_id)
+        month_file = get_month_file(user_id, month)
         if month_file and month_file.exists():
             with open(month_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -346,18 +362,15 @@ def logout():
 @app.route('/api/auth/me', methods=['GET'])
 def get_current_user_info():
     """Obtiene información del usuario actual"""
-    user_id = get_current_user()
-    if not user_id:
-        return jsonify({'authenticated': False}), 401
-    
-    sessions = load_sessions()
     token = request.headers.get('Authorization', '').replace('Bearer ', '') or request.cookies.get('auth_token')
-    session = sessions.get(token, {})
-    
+    session = get_session_from_token(token)
+    if not session:
+        return jsonify({'authenticated': False}), 401
+
     return jsonify({
         'authenticated': True,
         'user': {
-            'id': user_id,
+            'id': session.get('user_id'),
             'email': session.get('email', '')
         }
     })
